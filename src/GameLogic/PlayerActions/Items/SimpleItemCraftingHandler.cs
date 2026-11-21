@@ -4,6 +4,7 @@
 
 namespace MUnique.OpenMU.GameLogic.PlayerActions.Items;
 
+using System.Runtime.CompilerServices;
 using MUnique.OpenMU.DataModel.Configuration.ItemCrafting;
 using MUnique.OpenMU.DataModel.Configuration.Items;
 using MUnique.OpenMU.GameLogic.Views.NPC;
@@ -16,6 +17,11 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
     private readonly ItemPriceCalculator _priceCalculator = new();
 
     private readonly SimpleCraftingSettings _settings;
+
+    /// <summary>
+    /// The options of the input items of the currently running mixes, until the result items are created.
+    /// </summary>
+    private readonly ConditionalWeakTable<IList<CraftingRequiredItemLink>, MixInput> _mixInputs = new();
 
     /// <summary>
     /// Initializes a new instance of the <see cref="SimpleItemCraftingHandler"/> class.
@@ -135,6 +141,38 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
         return default;
     }
 
+    /// <summary>
+    /// Adds the regular item option (<see cref="ItemOptionTypes.Option"/>) with the level of a random input item.
+    /// The level is limited to the maximum level of the option.
+    /// </summary>
+    /// <param name="resultItem">The result item.</param>
+    /// <param name="player">The player.</param>
+    /// <param name="input">The options of the input items.</param>
+    /// <param name="selectOption">Selects the option out of the possible regular options of the result item.</param>
+    protected static void AddInheritedItemOption(Item resultItem, Player player, MixInput input, Func<IReadOnlyList<IncreasableItemOption>, IncreasableItemOption?> selectOption)
+    {
+        var level = input.RollOptionLevel();
+        if (level <= 0)
+        {
+            return;
+        }
+
+        var options = resultItem.Definition!.PossibleItemOptions
+            .SelectMany(o => o.PossibleOptions)
+            .Where(o => o.OptionType == ItemOptionTypes.Option)
+            .ToList();
+        if (options.Count == 0 || selectOption(options) is not { } option)
+        {
+            return;
+        }
+
+        var maximumLevel = option.LevelDependentOptions.Select(o => o.Level).DefaultIfEmpty(level).Max();
+        var link = player.PersistenceContext.CreateNew<ItemOptionLink>();
+        link.ItemOption = option;
+        link.Level = Math.Min(level, maximumLevel);
+        resultItem.ItemOptions.Add(link);
+    }
+
     /// <inheritdoc />
     protected override int GetPrice(byte successRate, IList<CraftingRequiredItemLink> requiredItems)
     {
@@ -229,7 +267,8 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
     /// <param name="resultItem">The result item.</param>
     /// <param name="player">The player.</param>
     /// <param name="successRate">The crafting combination success rate.</param>
-    protected virtual void AddRandomItemOption(Item resultItem, Player player, byte successRate)
+    /// <param name="input">The options of the input items.</param>
+    protected virtual void AddRandomItemOption(Item resultItem, Player player, byte successRate, MixInput input)
     {
     }
 
@@ -239,9 +278,16 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
     /// <param name="resultItem">The result item.</param>
     /// <param name="player">The player.</param>
     /// <param name="successRate">The crafting combination success rate.</param>
-    protected virtual void AddRandomLuckOption(Item resultItem, Player player, byte successRate)
+    /// <param name="input">The options of the input items.</param>
+    /// <remarks>
+    /// If equipment was mixed, the result gets luck with the share of the input items which had luck.
+    /// </remarks>
+    protected virtual void AddRandomLuckOption(Item resultItem, Player player, byte successRate, MixInput input)
     {
-        if (this._settings.ResultItemLuckOptionChance > 0 && Rand.NextRandomBool(this._settings.ResultItemLuckOptionChance)
+        var getsLuck = input.HasEquipment
+            ? input.RollLuck()
+            : this._settings.ResultItemLuckOptionChance > 0 && Rand.NextRandomBool(this._settings.ResultItemLuckOptionChance);
+        if (getsLuck
             && resultItem.Definition!.PossibleItemOptions.FirstOrDefault(o =>
                     o.PossibleOptions.Any(po => po.OptionType == ItemOptionTypes.Luck))
                 is { } luck)
@@ -257,7 +303,8 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
     /// </summary>
     /// <param name="resultItem">The result item.</param>
     /// <param name="successRate">The crafting combination success rate.</param>
-    protected virtual void AddRandomSkill(Item resultItem, byte successRate)
+    /// <param name="input">The options of the input items.</param>
+    protected virtual void AddRandomSkill(Item resultItem, byte successRate, MixInput input)
     {
         if (this._settings.ResultItemSkillChance > 0 && Rand.NextRandomBool(this._settings.ResultItemSkillChance)
             && !resultItem.HasSkill
@@ -267,12 +314,19 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
         }
     }
 
+    /// <inheritdoc />
+    protected override void OnMixSucceeding(IList<CraftingRequiredItemLink> requiredItems)
+    {
+        this._mixInputs.AddOrUpdate(requiredItems, MixInput.Create(requiredItems.SelectMany(link => link.Items)));
+    }
+
     private async ValueTask<List<Item>> CreateResultItemsAsync(Player player, IList<CraftingRequiredItemLink> referencedItems, ItemCraftingResultItem craftingResultItem, byte successRate)
     {
         int resultItemCount = this._settings.MultipleAllowed
             ? referencedItems.FirstOrDefault(r => r.ItemRequirement.Reference > 0)?.Items.Count() ?? 1
             : 1;
 
+        var input = this._mixInputs.TryGetValue(referencedItems, out var mixInput) ? mixInput : MixInput.Empty;
         var resultList = new List<Item>(resultItemCount);
         for (int i = 0; i < resultItemCount; i++)
         {
@@ -283,9 +337,9 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
                 ? (byte)new List<int> { 0, 1, 2, 3, 4 }.SelectWeightedRandom([30, 25, 20, 20, 5])
                 : (byte)Rand.NextInt(craftingResultItem.RandomMinimumLevel, craftingResultItem.RandomMaximumLevel + 1);
 
-            this.AddRandomLuckOption(resultItem, player, successRate);
-            this.AddRandomItemOption(resultItem, player, successRate);
-            this.AddRandomSkill(resultItem, successRate);
+            this.AddRandomLuckOption(resultItem, player, successRate, input);
+            this.AddRandomItemOption(resultItem, player, successRate, input);
+            this.AddRandomSkill(resultItem, successRate, input);
             this.AddRandomExcellentOptions(resultItem, player);
 
             resultItem.Durability = craftingResultItem.Durability ?? resultItem.GetMaximumDurabilityOfOnePiece();

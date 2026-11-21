@@ -529,9 +529,9 @@ public class IllusionTempleContextTest
         public ValueTask<(IEnumerable<Item> Items, uint? Money)> GenerateItemDropsAsync(MonsterDefinition monster, int gainedExperience, Player player)
             => ValueTask.FromResult((Enumerable.Empty<Item>(), default(uint?)));
 
-        public Item? GenerateItemDrop(DropItemGroup group) => new MUnique.OpenMU.Persistence.BasicModel.Item { Definition = this._itemDefinition };
+        public Item? GenerateItemDrop(DropItemGroup group, Character? character = null) => new MUnique.OpenMU.Persistence.BasicModel.Item { Definition = this._itemDefinition };
 
-        public (Item? Item, uint? Money, ItemDropEffect DropEffect) GenerateItemDrop(IEnumerable<DropItemGroup> groups)
+        public (Item? Item, uint? Money, ItemDropEffect DropEffect) GenerateItemDrop(IEnumerable<DropItemGroup> groups, Character? character = null)
             => (new MUnique.OpenMU.Persistence.BasicModel.Item { Definition = this._itemDefinition }, null, ItemDropEffect.Undefined);
     }
 

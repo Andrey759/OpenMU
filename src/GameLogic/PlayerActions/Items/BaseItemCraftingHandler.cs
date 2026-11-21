@@ -140,6 +140,15 @@ public abstract class BaseItemCraftingHandler : IItemCraftingHandler
     protected abstract ValueTask<List<Item>> CreateOrModifyResultItemsAsync(IList<CraftingRequiredItemLink> requiredItems, Player player, byte socketSlot, byte successRate);
 
     /// <summary>
+    /// Called when the mix succeeded, before the required items are changed or destroyed.
+    /// Allows to remember properties of the input items, e.g. to pass their options to the result.
+    /// </summary>
+    /// <param name="requiredItems">The required items.</param>
+    protected virtual void OnMixSucceeding(IList<CraftingRequiredItemLink> requiredItems)
+    {
+    }
+
+    /// <summary>
     /// Performs the crafting with the specified items.
     /// </summary>
     /// <param name="requiredItems">The required items.</param>
@@ -151,6 +160,7 @@ public abstract class BaseItemCraftingHandler : IItemCraftingHandler
     /// </returns>
     private async ValueTask<Item?> DoTheMixAsync(IList<CraftingRequiredItemLink> requiredItems, Player player, byte socketSlot, byte successRate)
     {
+        this.OnMixSucceeding(requiredItems);
         foreach (var requiredItemLink in requiredItems)
         {
             await this.RequiredItemChangeAsync(player, requiredItemLink, true, false).ConfigureAwait(false);
@@ -242,6 +252,21 @@ public abstract class BaseItemCraftingHandler : IItemCraftingHandler
 
                     item.Durability = item.GetMaximumDurabilityOfOnePiece();
                     player.Logger.LogDebug("Item {0} was downgraded from level {1} to {2}. Item option was removed.", item, previousLevel, item.Level);
+                });
+
+                break;
+            case MixResult.DowngradedByTwoLevels:
+                itemLink.Items.ForEach(item =>
+                {
+                    var previousLevel = item.Level;
+                    var previousMaxDurability = item.GetMaximumDurabilityOfOnePiece();
+                    item.Level = (byte)Math.Max(0, previousLevel - 2);
+                    if (previousMaxDurability > 0)
+                    {
+                        item.Durability = item.GetMaximumDurabilityOfOnePiece() * item.Durability / previousMaxDurability;
+                    }
+
+                    player.Logger.LogDebug("Item {0} was downgraded from level {1} to {2}.", item, previousLevel, item.Level);
                 });
 
                 break;

@@ -44,27 +44,20 @@ public class DinorantCrafting : SimpleItemCraftingHandler
     }
 
     /// <inheritdoc/>
-    protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate)
+    /// <remarks>
+    /// On this server the dinorant always gets all of its options.
+    /// </remarks>
+    protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate, MixInput input)
     {
-        if (Rand.NextRandomBool(30)
-            && resultItem.Definition!.PossibleItemOptions.FirstOrDefault(o =>
+        if (resultItem.Definition!.PossibleItemOptions.FirstOrDefault(o =>
                     o.PossibleOptions.Any(p => p.OptionType == ItemOptionTypes.Option))
-                is { } option)
+                is { } options)
         {
-            var link = player.PersistenceContext.CreateNew<ItemOptionLink>();
-            link.ItemOption = option.PossibleOptions.SelectRandom();
-            resultItem.ItemOptions.Add(link);
-
-            // There is a second rollout for an additional bonus option to the first (but only if it doesn't coincide).
-            if (Rand.NextRandomBool(20))
+            foreach (var option in options.PossibleOptions)
             {
-                var bonusOpt = option.PossibleOptions.SelectRandom();
-                if (bonusOpt != link.ItemOption)
-                {
-                    var bonusLink = player.PersistenceContext.CreateNew<ItemOptionLink>();
-                    bonusLink.ItemOption = bonusOpt;
-                    resultItem.ItemOptions.Add(bonusLink);
-                }
+                var link = player.PersistenceContext.CreateNew<ItemOptionLink>();
+                link.ItemOption = option;
+                resultItem.ItemOptions.Add(link);
             }
         }
     }

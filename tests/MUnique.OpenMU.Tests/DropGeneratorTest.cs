@@ -413,6 +413,71 @@ public class DropGeneratorTest
         Assert.That(item!.ItemOptions.Count(o => object.Equals(o.ItemOption?.OptionType, ItemOptionTypes.Excellent)), Is.EqualTo(2));
     }
 
+    /// <summary>
+    /// Tests that an item box only selects items which are qualified for the opening character.
+    /// </summary>
+    [Test]
+    public void TestItemBoxFiltersItemsByCharacterClass()
+    {
+        var selectedClass = new BasicModel.CharacterClass { Number = 1 };
+        var otherClass = new BasicModel.CharacterClass { Number = 2 };
+        var otherItem = this.CreateExcellentCapableItemDefinition(0, 1, 0);
+        otherItem.QualifiedCharacters.Add(otherClass);
+        var matchingItem = this.CreateExcellentCapableItemDefinition(0, 2, 0);
+        matchingItem.QualifiedCharacters.Add(selectedClass);
+        var box = this.CreateExcellentDropGroup(otherItem, matchingItem);
+        var character = new BasicModel.Character { CharacterClass = selectedClass };
+        var generator = new DefaultDropGenerator(this.GetGameConfig(), this.GetRandomizer(0));
+
+        var unfilteredItem = generator.GenerateItemDrop(new[] { box }).Item;
+        var filteredItem = generator.GenerateItemDrop(new[] { box }, character).Item;
+
+        Assert.That(unfilteredItem?.Definition, Is.SameAs(otherItem));
+        Assert.That(filteredItem?.Definition, Is.SameAs(matchingItem));
+    }
+
+    /// <summary>
+    /// Tests that ancient rewards only select items which are qualified for the receiving character.
+    /// </summary>
+    [Test]
+    public void TestAncientRewardFiltersItemsByCharacterClass()
+    {
+        var selectedClass = new BasicModel.CharacterClass { Number = 1 };
+        var otherClass = new BasicModel.CharacterClass { Number = 2 };
+        var otherItem = this.CreateAncientCapableItemDefinition(0, 1);
+        otherItem.QualifiedCharacters.Add(otherClass);
+        var matchingItem = this.CreateAncientCapableItemDefinition(0, 2);
+        matchingItem.QualifiedCharacters.Add(selectedClass);
+        var reward = this.CreateDropItemGroup(otherItem, matchingItem);
+        reward.ItemType = SpecialItemType.Ancient;
+        var character = new BasicModel.Character { CharacterClass = selectedClass };
+        var generator = new DefaultDropGenerator(this.GetGameConfig(otherItem, matchingItem), this.GetRandomizer(0));
+
+        var item = generator.GenerateItemDrop(reward, character);
+
+        Assert.That(item?.Definition, Is.SameAs(matchingItem));
+        Assert.That(item!.IsAncient(), Is.True);
+    }
+
+    private ItemDefinition CreateAncientCapableItemDefinition(byte group, short number)
+    {
+        var itemDefinition = this.CreateItemDefinition(group, number, 0);
+        itemDefinition.DropsFromMonsters = true;
+        var ancientOption = new BasicModel.IncreasableItemOption { OptionType = ItemOptionTypes.AncientOption };
+        var ancientOptions = new BasicModel.ItemOptionDefinition();
+        ancientOptions.PossibleOptions.Add(ancientOption);
+        var ancientSet = new BasicModel.ItemSetGroup { Options = ancientOptions };
+        ancientSet.Items.Add(new BasicModel.ItemOfItemSet
+        {
+            AncientSetDiscriminator = 1,
+            ItemDefinition = itemDefinition,
+            ItemSetGroup = ancientSet,
+        });
+        var itemDefinitionMock = Mock.Get(itemDefinition);
+        itemDefinitionMock.Setup(d => d.PossibleItemSetGroups).Returns(new List<ItemSetGroup> { ancientSet });
+        return itemDefinition;
+    }
+
     private IRandomizer GetRandomizerWithIncreasingInts()
     {
         var randomizer = new Mock<IRandomizer>();
@@ -471,6 +536,7 @@ public class DropGeneratorTest
         itemDefinition.Object.MaximumSockets = maximumSockets;
         itemDefinition.Setup(d => d.PossibleItemOptions).Returns(new List<ItemOptionDefinition> { excellentOptions });
         itemDefinition.Setup(d => d.PossibleItemSetGroups).Returns(new List<ItemSetGroup>());
+        itemDefinition.Setup(d => d.QualifiedCharacters).Returns(new List<CharacterClass>());
         return itemDefinition.Object;
     }
 
@@ -558,6 +624,7 @@ public class DropGeneratorTest
         itemDefinition.Object.Durability = 1;
         itemDefinition.Setup(d => d.PossibleItemOptions).Returns(new List<ItemOptionDefinition>());
         itemDefinition.Setup(d => d.PossibleItemSetGroups).Returns(new List<ItemSetGroup>());
+        itemDefinition.Setup(d => d.QualifiedCharacters).Returns(new List<CharacterClass>());
         return itemDefinition.Object;
     }
 }

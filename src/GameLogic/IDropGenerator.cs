@@ -24,13 +24,15 @@ public interface IDropGenerator
     /// Generates an item based on a <see cref="DropItemGroup"/>.
     /// </summary>
     /// <param name="group">The <see cref="DropItemGroup"/> which defines which item should be generated.</param>
+    /// <param name="character">The character for which the item is generated, if class filtering is required.</param>
     /// <returns>The generated item or <see langword="null"/>.</returns>
-    Item? GenerateItemDrop(DropItemGroup group);
+    Item? GenerateItemDrop(DropItemGroup group, Character? character = null);
 
     /// <summary>
     /// Generates an item based on a <see cref="DropItemGroup"/>s.
     /// </summary>
     /// <param name="groups">The <see cref="DropItemGroup"/>s which define which item should be generated.</param>
+    /// <param name="character">The character for which the item is generated, if class filtering is required.</param>
     /// <returns>The generated item, money and drop effect of the selected group.</returns>
-    (Item? Item, uint? Money, ItemDropEffect DropEffect) GenerateItemDrop(IEnumerable<DropItemGroup> groups);
+    (Item? Item, uint? Money, ItemDropEffect DropEffect) GenerateItemDrop(IEnumerable<DropItemGroup> groups, Character? character = null);
 }

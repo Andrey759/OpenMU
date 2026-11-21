@@ -1,15 +1,15 @@
-﻿// <copyright file="SecondWingsCrafting.cs" company="MUnique">
+// <copyright file="SecondWingsCrafting.cs" company="MUnique">
 // Licensed under the MIT License. See LICENSE file in the project root for full license information.
 // </copyright>
 
 namespace MUnique.OpenMU.GameLogic.PlayerActions.Craftings;
 
 using MUnique.OpenMU.DataModel.Configuration.ItemCrafting;
-using MUnique.OpenMU.DataModel.Configuration.Items;
 using MUnique.OpenMU.GameLogic.PlayerActions.Items;
 
 /// <summary>
-/// Crafting for Second Wings (including first capes).
+/// Crafting for Second Wings and the capes of Dark Lord and Rage Fighter.
+/// Luck and the level of the item option are inherited from the mixed equipment; the wings always get one wing option.
 /// </summary>
 public class SecondWingsCrafting : SimpleItemCraftingHandler
 {
@@ -23,33 +23,14 @@ public class SecondWingsCrafting : SimpleItemCraftingHandler
     }
 
     /// <inheritdoc/>
-    protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate)
+    protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate, MixInput input)
     {
-        if (resultItem.Definition!.PossibleItemOptions.Where(o => o.PossibleOptions.Any(p => p.OptionType == ItemOptionTypes.Option))
-                is { } options && options.Any())
-        {
-            (int chance, int level) = Rand.NextInt(0, 3) switch
-            {
-                0 => (20, 1),
-                1 => (10, 2),
-                _ => (4, 3),
-            }; // From 300 created wings about 20+10+4=34 (~11%) will have item option
+        AddInheritedItemOption(resultItem, player, input, WingCraftingOptions.SelectRegularOption);
+    }
 
-            if (Rand.NextRandomBool(chance))
-            {
-                var link = player.PersistenceContext.CreateNew<ItemOptionLink>();
-                link.Level = level;
-                if (options.Count() > 1)
-                {
-                    link.ItemOption = options.ElementAt(Rand.NextInt(0, 2)).PossibleOptions.First();
-                }
-                else
-                {
-                    link.ItemOption = options.ElementAt(0).PossibleOptions.First(); // Cape of Lord
-                }
-
-                resultItem.ItemOptions.Add(link);
-            }
-        }
+    /// <inheritdoc/>
+    protected override void AddRandomExcellentOptions(Item resultItem, Player player)
+    {
+        WingCraftingOptions.AddOneWingOption(resultItem, player);
     }
 }

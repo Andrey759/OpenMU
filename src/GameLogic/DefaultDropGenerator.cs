@@ -95,7 +95,7 @@ public class DefaultDropGenerator : IDropGenerator
 
         uint money = 0;
         var itemDropRate = 1.0 + (player.Attributes?[Stats.BonusItemDropRate] ?? 0);
-        var (droppedItems, moneyResult) = this.GenerateDrops(monster, gainedExperience, itemDropRate);
+        var (droppedItems, moneyResult) = this.GenerateDrops(monster, gainedExperience, itemDropRate, character);
         if (moneyResult > 0)
         {
             money = moneyResult;
@@ -107,13 +107,13 @@ public class DefaultDropGenerator : IDropGenerator
     }
 
     /// <inheritdoc/>
-    public Item? GenerateItemDrop(DropItemGroup selectedGroup)
+    public Item? GenerateItemDrop(DropItemGroup selectedGroup, Character? character = null)
     {
-        return this.GenerateItemDrop(selectedGroup, selectedGroup.PossibleItems);
+        return this.GenerateItemDrop(selectedGroup, selectedGroup.PossibleItems, character);
     }
 
     /// <inheritdoc/>
-    public (Item? Item, uint? Money, ItemDropEffect DropEffect) GenerateItemDrop(IEnumerable<DropItemGroup> groups)
+    public (Item? Item, uint? Money, ItemDropEffect DropEffect) GenerateItemDrop(IEnumerable<DropItemGroup> groups, Character? character = null)
     {
         var group = this.SelectRandomGroup(groups.OrderBy(group => group.Chance), 1.0);
         if (group is null)
@@ -132,7 +132,7 @@ public class DefaultDropGenerator : IDropGenerator
             }
         }
 
-        return (this.GenerateItemDrop(group), null, dropEffect);
+        return (this.GenerateItemDrop(group, character), null, dropEffect);
     }
 
     /// <summary>
@@ -213,10 +213,18 @@ public class DefaultDropGenerator : IDropGenerator
     /// <summary>
     /// Gets a random ancient item.
     /// </summary>
+    /// <param name="possibleItems">The possible items of the drop group. These are only considered when a character is supplied.</param>
+    /// <param name="character">The character for which the item is generated, if class filtering is required.</param>
     /// <returns>A random ancient item.</returns>
-    protected Item? GenerateRandomAncient()
+    protected Item? GenerateRandomAncient(ICollection<ItemDefinition>? possibleItems = null, Character? character = null)
     {
-        var item = this.GenerateRandomItem(this._ancientItems);
+        var ancientItems = this._ancientItems;
+        if (character is not null && possibleItems?.Count > 0)
+        {
+            ancientItems = this._ancientItems.Intersect(possibleItems).ToList();
+        }
+
+        var item = this.GenerateRandomItem(FilterForCharacter(ancientItems, character));
         if (item is null)
         {
             return null;
@@ -282,6 +290,25 @@ public class DefaultDropGenerator : IDropGenerator
         return itemDefinition.MaximumDropLevel is not { } maxDropLevel || monsterLevel <= maxDropLevel;
     }
 
+    private static ICollection<ItemDefinition> FilterForCharacter(ICollection<ItemDefinition> possibleItems, Character? character)
+    {
+        if (character?.CharacterClass is not { } characterClass)
+        {
+            return possibleItems;
+        }
+
+        // The class itself and the classes it can still evolve into (e.g. Dark Wizard -> Soul Master -> Grand Master).
+        var family = new HashSet<byte>();
+        for (var current = characterClass; current is not null && family.Add(current.Number); current = current.NextGenerationClass)
+        {
+        }
+
+        return possibleItems
+            .Where(item => item.QualifiedCharacters is not { Count: > 0 } qualifiedClasses
+                           || qualifiedClasses.Any(qualifiedClass => family.Contains(qualifiedClass.Number)))
+            .ToList();
+    }
+
     /// <summary>
     /// Gets the chance of a drop item group, raised by the item drop rate when it drops items.
     /// </summary>
@@ -293,7 +320,7 @@ public class DefaultDropGenerator : IDropGenerator
         return group.ItemType == SpecialItemType.Money ? group.Chance : group.Chance * itemDropRate;
     }
 
-    private (IList<Item>? Items, uint Money) GenerateDrops(MonsterDefinition monster, int gainedExperience, double itemDropRate)
+    private (IList<Item>? Items, uint Money) GenerateDrops(MonsterDefinition monster, int gainedExperience, double itemDropRate, Character character)
     {
         uint money = 0;
         List<Item>? droppedItems = null;
@@ -307,7 +334,7 @@ public class DefaultDropGenerator : IDropGenerator
                 break;
             }
 
-            var item = this.GenerateItemDropOrMoney(monster, group, gainedExperience, out var droppedMoney);
+            var item = this.GenerateItemDropOrMoney(monster, group, gainedExperience, character, out var droppedMoney);
             if (item is not null)
             {
                 droppedItems ??= new List<Item>(monster.NumberOfMaximumItemDrops);
@@ -339,7 +366,7 @@ public class DefaultDropGenerator : IDropGenerator
                     continue;
                 }
 
-                var item = this.GenerateItemDropOrMoney(monster, group, gainedExperience, out var droppedMoney);
+                var item = this.GenerateItemDropOrMoney(monster, group, gainedExperience, character, out var droppedMoney);
                 if (item is not null)
                 {
                     droppedItems ??= new List<Item>(monster.NumberOfMaximumItemDrops);
@@ -376,13 +403,13 @@ public class DefaultDropGenerator : IDropGenerator
         }
     }
 
-    private Item? GenerateItemDrop(DropItemGroup selectedGroup, ICollection<ItemDefinition> possibleItems)
+    private Item? GenerateItemDrop(DropItemGroup selectedGroup, ICollection<ItemDefinition> possibleItems, Character? character = null)
     {
         var item = selectedGroup.ItemType switch
         {
-            SpecialItemType.Ancient => this.GenerateRandomAncient(),
-            SpecialItemType.Excellent => this.GenerateRandomExcellentItem(possibleItems: possibleItems, dropGroup: selectedGroup),
-            _ => this.GenerateRandomItem(possibleItems),
+            SpecialItemType.Ancient => this.GenerateRandomAncient(possibleItems, character),
+            SpecialItemType.Excellent => this.GenerateRandomExcellentItem(possibleItems: FilterForCharacter(possibleItems, character), dropGroup: selectedGroup),
+            _ => this.GenerateRandomItem(FilterForCharacter(possibleItems, character)),
         };
 
         if (item is null)
@@ -481,12 +508,12 @@ public class DefaultDropGenerator : IDropGenerator
         var itemOfSet = ancientSet.Items.First(i => object.Equals(i.ItemDefinition, item.Definition));
         item.ItemSetGroups.Add(itemOfSet);
 
-        // For example: +5str or +10str.
+        // For example: +5str or +10str. On this server always the highest bonus.
         if (itemOfSet.BonusOption is { } bonusOption)
         {
             var bonusOptionLink = new ItemOptionLink();
             bonusOptionLink.ItemOption = bonusOption;
-            bonusOptionLink.Level = bonusOption.LevelDependentOptions.Select(o => o.Level).SelectRandom();
+            bonusOptionLink.Level = bonusOption.LevelDependentOptions.Select(o => o.Level).DefaultIfEmpty(1).Max();
             item.ItemOptions.Add(bonusOptionLink);
         }
     }
@@ -512,7 +539,9 @@ public class DefaultDropGenerator : IDropGenerator
         {
             // The drop group may allow more options than the item definition provides. Add each option
             // only once and stop when there is nothing left, instead of searching forever.
+            // The "increase zen drop rate" option is the weakest one, so this server never rolls it.
             var remainingOptions = excellentOptions.PossibleOptions
+                .Where(possibleOption => possibleOption.PowerUpDefinition?.TargetAttribute != Stats.MoneyAmountRate)
                 .Where(possibleOption => item.ItemOptions.All(link => !object.Equals(link.ItemOption, possibleOption)))
                 .ToList();
             if (remainingOptions.Count == 0)
@@ -543,13 +572,13 @@ public class DefaultDropGenerator : IDropGenerator
         }
     }
 
-    private Item? GenerateItemDropOrMoney(MonsterDefinition monster, DropItemGroup selectedGroup, int gainedExperience, out uint? droppedMoney)
+    private Item? GenerateItemDropOrMoney(MonsterDefinition monster, DropItemGroup selectedGroup, int gainedExperience, Character character, out uint? droppedMoney)
     {
         droppedMoney = null;
 
         if (selectedGroup.PossibleItems?.Count > 0)
         {
-            return this.GenerateItemFromGroup(monster, selectedGroup);
+            return this.GenerateItemFromGroup(monster, selectedGroup, character);
         }
 
         var item = this.GenerateSpecialItem(monster, selectedGroup);
@@ -561,12 +590,19 @@ public class DefaultDropGenerator : IDropGenerator
         return item;
     }
 
-    private Item? GenerateItemFromGroup(MonsterDefinition monster, DropItemGroup selectedGroup)
+    private Item? GenerateItemFromGroup(MonsterDefinition monster, DropItemGroup selectedGroup, Character character)
     {
         var isDropSpecificForMonster = monster.DropItemGroups.Contains(selectedGroup);
         if (isDropSpecificForMonster)
         {
-            return this.GenerateItemDrop(selectedGroup, selectedGroup.PossibleItems!);
+            return this.GenerateItemDrop(selectedGroup, selectedGroup.PossibleItems!, character);
+        }
+
+        // A group which restricts the monster levels itself (e.g. the gear tier of a map on this server)
+        // decides on its own which monsters drop its items, so the items' drop levels don't apply.
+        if (selectedGroup.MinimumMonsterLevel.HasValue || selectedGroup.MaximumMonsterLevel.HasValue)
+        {
+            return this.GenerateItemDrop(selectedGroup, selectedGroup.PossibleItems!, character);
         }
 
         // The items of the group are configured explicitly, so only their own drop level
@@ -576,7 +612,7 @@ public class DefaultDropGenerator : IDropGenerator
             .Where(it => CanDropAtMonsterLevel(it, monsterLevel))
             .ToList();
 
-        return this.GenerateItemDrop(selectedGroup, filteredPossibleItems);
+        return this.GenerateItemDrop(selectedGroup, filteredPossibleItems, character);
     }
 
     private Item? GenerateSpecialItem(MonsterDefinition monster, DropItemGroup selectedGroup)

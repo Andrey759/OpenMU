@@ -171,6 +171,12 @@
   <data name="PeriodicSaveProgressPlugIn_Description" xml:space="preserve">
     <value>Saves the progress of players periodically when their status is 'EnteredWorld'.</value>
   </data>
+  <data name="PersonalDropTuningPlugIn_Name" xml:space="preserve">
+    <value>Personal drop tuning</value>
+  </data>
+  <data name="PersonalDropTuningPlugIn_Description" xml:space="preserve">
+    <value>Attaches class-specific drop groups to new characters and adds luck and a configurable regular option level to normal equipment dropped by monsters.</value>
+  </data>
   <data name="PlayerLosesExperienceAfterDeathPlugIn_Name" xml:space="preserve">
     <value>Player exp loss after death</value>
   </data>

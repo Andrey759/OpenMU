@@ -23,7 +23,7 @@ public class DarkHorseCrafting : SimpleItemCraftingHandler
     }
 
     /// <inheritdoc/>
-    protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate)
+    protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate, MixInput input)
     {
         if (resultItem.Definition!.PossibleItemOptions.FirstOrDefault(o =>
                     o.PossibleOptions.Any(p => p.OptionType == ItemOptionTypes.DarkHorse))

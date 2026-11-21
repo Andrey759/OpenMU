@@ -38,4 +38,9 @@ public enum MixResult
     /// Used by the Talisman of Chaos Assembly, which keeps the item of a +10 to +15 item upgrade.
     /// </remarks>
     DisappearAndProtectReferencedItems = 4,
+
+    /// <summary>
+    /// The item will be downgraded by two levels (not below level 0); options, luck and skill stay as they are.
+    /// </summary>
+    DowngradedByTwoLevels = 5,
 }

@@ -10,6 +10,7 @@ using MUnique.OpenMU.GameLogic.PlayerActions.Items;
 
 /// <summary>
 /// Crafting for Chaos Weapon and First Wings.
+/// Luck and the item option are inherited from the mixed equipment, the skill is always added.
 /// </summary>
 public class ChaosWeaponAndFirstWingsCrafting : SimpleItemCraftingHandler
 {
@@ -23,8 +24,14 @@ public class ChaosWeaponAndFirstWingsCrafting : SimpleItemCraftingHandler
     }
 
     /// <inheritdoc/>
-    protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate)
+    protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate, MixInput input)
     {
+        if (input.HasEquipment)
+        {
+            AddInheritedItemOption(resultItem, player, input, options => options[0]);
+            return;
+        }
+
         if (resultItem.Definition!.PossibleItemOptions.FirstOrDefault(o =>
                     o.PossibleOptions.Any(p => p.OptionType == ItemOptionTypes.Option))
                 is { } option)
@@ -41,8 +48,14 @@ public class ChaosWeaponAndFirstWingsCrafting : SimpleItemCraftingHandler
     }
 
     /// <inheritdoc/>
-    protected override void AddRandomLuckOption(Item resultItem, Player player, byte successRate)
+    protected override void AddRandomLuckOption(Item resultItem, Player player, byte successRate, MixInput input)
     {
+        if (input.HasEquipment)
+        {
+            base.AddRandomLuckOption(resultItem, player, successRate, input);
+            return;
+        }
+
         if (Rand.NextRandomBool((successRate / 5) + 4)
             && resultItem.Definition!.PossibleItemOptions.FirstOrDefault(o =>
                     o.PossibleOptions.Any(po => po.OptionType == ItemOptionTypes.Luck))
@@ -55,11 +68,12 @@ public class ChaosWeaponAndFirstWingsCrafting : SimpleItemCraftingHandler
     }
 
     /// <inheritdoc/>
-    protected override void AddRandomSkill(Item resultItem, byte successRate)
+    /// <remarks>
+    /// On this server a chaos weapon always gets its skill.
+    /// </remarks>
+    protected override void AddRandomSkill(Item resultItem, byte successRate, MixInput input)
     {
-        if (Rand.NextRandomBool((successRate / 5) + 6)
-            && !resultItem.HasSkill
-            && resultItem.Definition!.Skill is { })
+        if (resultItem.Definition!.Skill is { })
         {
             resultItem.HasSkill = true;
         }

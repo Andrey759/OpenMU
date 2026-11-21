@@ -89,14 +89,14 @@ public class ChaosCastleDropGenerator : IDropGenerator
     }
 
     /// <inheritdoc />
-    public Item? GenerateItemDrop(DropItemGroup group)
+    public Item? GenerateItemDrop(DropItemGroup group, Character? character = null)
     {
-        return this._gameContext.DropGenerator.GenerateItemDrop(group);
+        return this._gameContext.DropGenerator.GenerateItemDrop(group, character);
     }
 
     /// <inheritdoc />
-    public (Item? Item, uint? Money, ItemDropEffect DropEffect) GenerateItemDrop(IEnumerable<DropItemGroup> groups)
+    public (Item? Item, uint? Money, ItemDropEffect DropEffect) GenerateItemDrop(IEnumerable<DropItemGroup> groups, Character? character = null)
     {
-        return this._gameContext.DropGenerator.GenerateItemDrop(groups);
+        return this._gameContext.DropGenerator.GenerateItemDrop(groups, character);
     }
 }
