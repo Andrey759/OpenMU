@@ -7,6 +7,7 @@
 namespace MUnique.OpenMU.GameLogic.PlayerActions.ItemConsumeActions;
 
 using MUnique.OpenMU.DataModel.Configuration.Items;
+using MUnique.OpenMU.GameLogic.Attributes;
 using MUnique.OpenMU.Persistence;
 using MUnique.OpenMU.PlugIns;
 
@@ -46,7 +47,7 @@ public abstract class UpgradeItemLevelJewelConsumeHandlerPlugIn<TConfig>
     /// <inheritdoc/>
     protected override bool ModifyItem(Item item, IContext persistenceContext)
     {
-        if (!item.CanLevelBeUpgraded())
+        if (!item.CanLevelBeUpgraded() && !IsUpgradeableJewelery(item))
         {
             return false;
         }
@@ -95,6 +96,20 @@ public abstract class UpgradeItemLevelJewelConsumeHandlerPlugIn<TConfig>
 
         item.Durability = item.GetMaximumDurabilityOfOnePiece();
         return true; // true doesn't mean that it was successful, just that the consumption happened.
+    }
+
+    /// <summary>
+    /// Rings and pendants have levels too (up to +4, their resistance grows with the level), which the original game
+    /// only gave them with the drop. Jewelery without such a level bonus is left out: the level of a transformation
+    /// ring selects its monster.
+    /// </summary>
+    private static bool IsUpgradeableJewelery(Item item)
+    {
+        return item.IsWearable()
+               && item.Definition!.ItemSlot!.ItemSlots.Any(slot => slot == InventoryConstants.PendantSlot || slot == InventoryConstants.Ring1Slot || slot == InventoryConstants.Ring2Slot)
+               && item.Definition.BasePowerUpAttributes.Any(powerUp => powerUp.BonusPerLevelTable is not null)
+               && item.Definition.BasePowerUpAttributes.All(powerUp => powerUp.TargetAttribute != Stats.TransformationSkin)
+               && item.Level < item.Definition.MaximumItemLevel;
     }
 
     private static bool ItemHasLuck(Item item)
