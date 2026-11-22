@@ -7,6 +7,7 @@ namespace MUnique.OpenMU.GameLogic.PlayerActions.Craftings;
 using MUnique.OpenMU.DataModel.Configuration.ItemCrafting;
 using MUnique.OpenMU.DataModel.Configuration.Items;
 using MUnique.OpenMU.GameLogic.PlayerActions.Items;
+using MUnique.OpenMU.GameLogic.Views.NPC;
 
 /// <summary>
 /// Crafting for Chaos Weapon and First Wings.
@@ -21,6 +22,36 @@ public class ChaosWeaponAndFirstWingsCrafting : SimpleItemCraftingHandler
     public ChaosWeaponAndFirstWingsCrafting(SimpleCraftingSettings settings)
         : base(settings)
     {
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A chaos weapon in the machine selects the mix by the jewels besides it: without Bless and Soul it's the first
+    /// wings, with them it's a level upgrade (+10 and higher). So a chaos weapon isn't the material for another
+    /// chaos weapon, and the wings don't take Bless or Soul.
+    /// </remarks>
+    public override CraftingResult? TryGetRequiredItems(Player player, out IList<CraftingRequiredItemLink> items, out byte successRate)
+    {
+        if (base.TryGetRequiredItems(player, out items, out successRate) is { } error)
+        {
+            return error;
+        }
+
+        var isWingsCrafting = items.Any(link => link.ItemRequirement.PossibleItems.Any()
+                                                && link.ItemRequirement.PossibleItems.All(IsChaosWeapon));
+        if (isWingsCrafting)
+        {
+            if (items.Any(link => link.Items.Any(i => i.Definition is { Group: 14, Number: 13 or 14 })))
+            {
+                return CraftingResult.IncorrectMixItems;
+            }
+        }
+        else if (items.Any(link => !link.ItemRequirement.PossibleItems.Any() && link.Items.Any(i => i.Definition is { } d && IsChaosWeapon(d))))
+        {
+            return CraftingResult.IncorrectMixItems;
+        }
+
+        return null;
     }
 
     /// <inheritdoc/>
@@ -84,4 +115,8 @@ public class ChaosWeaponAndFirstWingsCrafting : SimpleItemCraftingHandler
             resultItem.HasSkill = true;
         }
     }
+
+    /// <summary>Chaos Dragon Axe, Chaos Nature Bow and Chaos Lightning Staff.</summary>
+    private static bool IsChaosWeapon(ItemDefinition definition)
+        => definition is { Group: 2, Number: 6 } or { Group: 4, Number: 6 } or { Group: 5, Number: 7 };
 }

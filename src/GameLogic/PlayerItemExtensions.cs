@@ -35,6 +35,34 @@ public static class PlayerItemExtensions
     }
 
     /// <summary>
+    /// Gets a free equipment slot which the item fits and the player may wear it in, as the item move checks it.
+    /// </summary>
+    /// <param name="player">The player.</param>
+    /// <param name="item">The item.</param>
+    /// <returns>The slot, or <c>null</c> if there is none.</returns>
+    public static byte? GetFreeEquipmentSlot(this Player player, Item item)
+    {
+        if (player.Inventory is not { } inventory
+            || item.Definition?.ItemSlot is not { } itemSlot
+            || player.SelectedCharacter?.CharacterClass is null
+            || (player.CurrentMiniGame is { } miniGame && !miniGame.IsItemAllowedToEquip(item))
+            || !player.CompliesRequirements(item))
+        {
+            return null;
+        }
+
+        foreach (var slot in itemSlot.ItemSlots.Where(s => s <= InventoryConstants.LastEquippableItemSlotIndex).Select(s => (byte)s))
+        {
+            if (inventory.GetItem(slot) is null && !item.Definition.ConflictsWithEquippedHands(inventory, slot))
+            {
+                return slot;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Destroys an item of the <see cref="Player.Inventory"/>.
     /// </summary>
     /// <param name="player">The player.</param>

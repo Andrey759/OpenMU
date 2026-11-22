@@ -163,6 +163,16 @@ internal sealed class PlayerStorages
                 continue;
             }
 
+            if (await this.TryEquipAsync(inventory, item).ConfigureAwait(false))
+            {
+                this._player.Logger.LogWarning(
+                    "Inventory of player {player} was full, the item {item} was put into a free equipment slot. id: {itemid}",
+                    this._player.Name,
+                    item,
+                    item.GetId());
+                continue;
+            }
+
             if (vault is not null && await vault.AddItemAsync(item).ConfigureAwait(false))
             {
                 this._player.Logger.LogWarning(
@@ -184,6 +194,16 @@ internal sealed class PlayerStorages
         }
 
         return allPlaced;
+    }
+
+    /// <summary>
+    /// Puts the item into a free equipment slot which it fits and the character may wear, e.g. a weapon which was
+    /// taken from the hand into the chaos machine while the inventory is full.
+    /// </summary>
+    private async ValueTask<bool> TryEquipAsync(IInventoryStorage inventory, Item item)
+    {
+        return this._player.GetFreeEquipmentSlot(item) is { } slot
+               && await inventory.AddItemAsync(slot, item).ConfigureAwait(false);
     }
 
     /// <summary>

@@ -92,7 +92,8 @@ public class BuyNpcItemAction
         }
         else
         {
-            var toSlot = player.Inventory!.CheckInvSpace(itemTemplate);
+            // With a full inventory, the item is put on right away when its equipment slot is free.
+            var toSlot = player.Inventory!.CheckInvSpace(itemTemplate) ?? player.GetFreeEquipmentSlot(itemTemplate);
             if (toSlot is null)
             {
                 await player.ShowLocalizedBlueMessageAsync(nameof(PlayerMessage.InventoryFull)).ConfigureAwait(false);
@@ -111,7 +112,7 @@ public class BuyNpcItemAction
             newItem.AssignValues(itemTemplate);
             newItem.ItemSlot = (byte)toSlot;
             await player.InvokeViewPlugInAsync<INpcItemBoughtPlugIn>(p => p.NpcItemBoughtAsync(newItem)).ConfigureAwait(false);
-            await player.Inventory.AddItemAsync(newItem).ConfigureAwait(false);
+            await player.Inventory.AddItemAsync((byte)toSlot, newItem).ConfigureAwait(false);
             player.GameContext.PlugInManager.GetPlugInPoint<IItemBoughtFromMerchantPlugIn>()?.ItemBought(player, newItem, storeItem, merchant);
             if (purchasePlugIns is not null)
             {
