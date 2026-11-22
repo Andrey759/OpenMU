@@ -23,6 +23,12 @@ public class ThirdWingsCrafting : SimpleItemCraftingHandler
     }
 
     /// <inheritdoc/>
+    protected override ItemCraftingResultItem SelectResultItem(ICollection<ItemCraftingResultItem> results, IList<CraftingRequiredItemLink> requiredItems, Player player)
+    {
+        return CraftingResultClassSelection.Select(results, requiredItems, player);
+    }
+
+    /// <inheritdoc/>
     protected override void AddRandomItemOption(Item resultItem, Player player, byte successRate, MixInput input)
     {
         AddInheritedItemOption(resultItem, player, input, WingCraftingOptions.SelectRegularOption);

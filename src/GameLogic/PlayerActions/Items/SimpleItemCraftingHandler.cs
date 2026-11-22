@@ -195,12 +195,24 @@ public class SimpleItemCraftingHandler : BaseItemCraftingHandler
                && requiredItem.RequiredItemOptions.All(r => item.ItemOptions.Any(o => o.ItemOption!.OptionType == r));
     }
 
+    /// <summary>
+    /// Selects the result item when only one of the <see cref="SimpleCraftingSettings.ResultItems"/> is created.
+    /// </summary>
+    /// <param name="results">The possible result items.</param>
+    /// <param name="requiredItems">The required items of the mix.</param>
+    /// <param name="player">The player.</param>
+    /// <returns>The selected result item.</returns>
+    protected virtual ItemCraftingResultItem SelectResultItem(ICollection<ItemCraftingResultItem> results, IList<CraftingRequiredItemLink> requiredItems, Player player)
+    {
+        return results.SelectRandom()!;
+    }
+
     /// <inheritdoc />
     protected override async ValueTask<List<Item>> CreateOrModifyResultItemsAsync(IList<CraftingRequiredItemLink> requiredItems, Player player, byte socketSlot, byte successRate)
     {
         var resultItems = this._settings.ResultItemSelect == ResultItemSelection.All
             ? this._settings.ResultItems
-            : this._settings.ResultItems.SelectRandom().GetAsEnumerable();
+            : this.SelectResultItem(this._settings.ResultItems, requiredItems, player).GetAsEnumerable();
 
         var resultList = new List<Item>();
         foreach (var craftingResultItem in resultItems)
